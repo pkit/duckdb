@@ -6,7 +6,7 @@ import platform
 
 from setuptools import setup, Extension
 
-from setup_utils import setup_data_files, get_scm_conf, get_setup_requires, get_extension_args
+from setup_utils import setup_data_files, get_scm_conf, get_setup_requires, get_extension_args, parallel_cpp_compile
 
 extensions = ['parquet', 'icu', 'fts', 'tpch', 'tpcds', 'visualizer']
 
@@ -14,6 +14,11 @@ if platform.system() == 'Windows':
     extensions = ['parquet', 'icu', 'fts']
 
 libraries = []
+
+# speed up compilation with: -j = cpu_number() on non Windows machines
+if os.name != 'nt':
+    import distutils.ccompiler
+    distutils.ccompiler.CCompiler.compile = parallel_cpp_compile
 
 # make sure we are in the right directory
 os.chdir(os.path.dirname(os.path.realpath(__file__)))
