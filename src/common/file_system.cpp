@@ -3,6 +3,7 @@
 #include "duckdb/common/checksum.hpp"
 #include "duckdb/common/exception.hpp"
 #include "duckdb/common/gzip_file_system.hpp"
+#include "duckdb/common/pipe_file_system.hpp"
 #include "duckdb/common/helper.hpp"
 #include "duckdb/common/string_util.hpp"
 #include "duckdb/function/scalar/string_functions.hpp"
@@ -225,6 +226,15 @@ time_t FileSystem::GetLastModifiedTime(FileHandle &handle) {
 		return -1;
 	}
 	return s.st_mtime;
+}
+
+int32_t FileSystem::GetFileType(FileHandle &handle) {
+	int fd = ((UnixFileHandle &)handle).fd;
+	struct stat s;
+	if (fstat(fd, &s) == -1) {
+		return -1;
+	}
+	return s.st_mode & S_IFMT;
 }
 
 void FileSystem::Truncate(FileHandle &handle, int64_t new_size) {
@@ -891,6 +901,10 @@ void FileHandle::Truncate(int64_t new_size) {
 	file_system.Truncate(*this, new_size);
 }
 
+int32_t FileHandle::GetType() {
+	return file_system.GetFileType(*this);
+}
+
 static bool HasGlob(const string &str) {
 	for (idx_t i = 0; i < str.size(); i++) {
 		switch (str[i]) {
@@ -1022,7 +1036,10 @@ unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, uint8_t f
 	}
 	// open the base file handle
 	auto file_handle = FindFileSystem(path)->OpenFile(path, flags, lock, FileCompressionType::UNCOMPRESSED);
-	if (compression != FileCompressionType::UNCOMPRESSED) {
+	if (file_handle->GetType() == S_IFIFO) {
+		file_handle = PipeFileSystem::OpenPipe(move(file_handle));
+	}
+	else if (compression != FileCompressionType::UNCOMPRESSED) {
 		switch (compression) {
 		case FileCompressionType::GZIP:
 			file_handle = GZipFileSystem::OpenCompressedFile(move(file_handle));
