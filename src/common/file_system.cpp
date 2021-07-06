@@ -228,13 +228,30 @@ time_t FileSystem::GetLastModifiedTime(FileHandle &handle) {
 	return s.st_mtime;
 }
 
-int32_t FileSystem::GetFileType(FileHandle &handle) {
+uint8_t FileSystem::GetFileType(FileHandle &handle) {
 	int fd = ((UnixFileHandle &)handle).fd;
 	struct stat s;
 	if (fstat(fd, &s) == -1) {
 		return -1;
 	}
-	return s.st_mode & S_IFMT;
+	switch (s.st_mode & S_IFMT) {
+	case S_IFBLK:
+		return FileType::FILE_TYPE_BLOCK;
+	case S_IFCHR:
+		return FileType::FILE_TYPE_CHAR;
+	case S_IFIFO:
+		return FileType::FILE_TYPE_FIFO;
+	case S_IFDIR:
+		return FileType::FILE_TYPE_DIR;
+	case S_IFLNK:
+		return FileType::FILE_TYPE_LINK;
+	case S_IFREG:
+		return FileType::FILE_TYPE_REGULAR;
+	case S_IFSOCK:
+		return FileType::FILE_TYPE_SOCKET;
+	default:
+		return 0;
+	}
 }
 
 void FileSystem::Truncate(FileHandle &handle, int64_t new_size) {
@@ -775,6 +792,21 @@ string FileSystem::GetWorkingDirectory() {
 	}
 	return string(buffer.get(), ret);
 }
+
+uint8_t FileSystem::GetFileType(FileHandle &handle) {
+	auto path = ((WindowsFileHandle &)handle).path;
+	if (strncmp(path.c_str(), "\\\\.\\pipe\\", 9) == 0) {
+		return FileType::FILE_TYPE_FIFO;
+	}
+	DWORD attrs = GetFileAttributesA(path.c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES) {
+	    if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
+		    return FileType::FILE_TYPE_DIR;
+	    } else {
+		    return FileType::FILE_TYPE_REGULAR;
+	    }
+    }
+}
 #endif
 
 string FileSystem::GetHomeDirectory() {
@@ -901,7 +933,7 @@ void FileHandle::Truncate(int64_t new_size) {
 	file_system.Truncate(*this, new_size);
 }
 
-int32_t FileHandle::GetType() {
+uint8_t FileHandle::GetType() {
 	return file_system.GetFileType(*this);
 }
 
@@ -1036,7 +1068,7 @@ unique_ptr<FileHandle> VirtualFileSystem::OpenFile(const string &path, uint8_t f
 	}
 	// open the base file handle
 	auto file_handle = FindFileSystem(path)->OpenFile(path, flags, lock, FileCompressionType::UNCOMPRESSED);
-	if (file_handle->GetType() == S_IFIFO) {
+	if (file_handle->GetType() == FileType::FILE_TYPE_FIFO) {
 		file_handle = PipeFileSystem::OpenPipe(move(file_handle));
 	}
 	else if (compression != FileCompressionType::UNCOMPRESSED) {

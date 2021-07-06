@@ -48,7 +48,7 @@ public:
 	bool CanSeek();
 	bool OnDiskFile();
 	idx_t GetFileSize();
-	int32_t GetType();
+	uint8_t GetType();
 
 protected:
 	virtual void Close() = 0;
@@ -74,6 +74,24 @@ public:
 	static constexpr uint8_t FILE_FLAGS_FILE_CREATE_NEW = 1 << 4;
 	//! Open file in append mode
 	static constexpr uint8_t FILE_FLAGS_APPEND = 1 << 5;
+};
+
+class FileType {
+public:
+	//! Regular file
+	static constexpr uint8_t FILE_TYPE_REGULAR = 1 << 0;
+	//! Directory
+	static constexpr uint8_t FILE_TYPE_DIR = 1 << 1;
+	//! FIFO named pipe
+	static constexpr uint8_t FILE_TYPE_FIFO = 1 << 2;
+	//! Socket
+	static constexpr uint8_t FILE_TYPE_SOCKET = 1 << 3;
+	//! Symbolic link
+	static constexpr uint8_t FILE_TYPE_LINK = 1 << 4;
+	//! Block device
+	static constexpr uint8_t FILE_TYPE_BLOCK = 1 << 5;
+	//! Character device
+	static constexpr uint8_t FILE_TYPE_CHAR = 1 << 6;
 };
 
 class FileSystem {
@@ -106,7 +124,7 @@ public:
 	//! Returns the file last modified time of a file handle, returns timespec with zero on all attributes on error
 	virtual time_t GetLastModifiedTime(FileHandle &handle);
 	//! Returns the file last modified time of a file handle, returns timespec with zero on all attributes on error
-	virtual int32_t GetFileType(FileHandle &handle);
+	virtual uint8_t GetFileType(FileHandle &handle);
 	//! Truncate a file to a maximum size of new_size, new_size should be smaller than or equal to the current size of
 	//! the file
 	virtual void Truncate(FileHandle &handle, int64_t new_size);
@@ -206,7 +224,7 @@ public:
 	time_t GetLastModifiedTime(FileHandle &handle) override {
 		return handle.file_system.GetLastModifiedTime(handle);
 	}
-	int32_t GetFileType(FileHandle &handle) override {
+	uint8_t GetFileType(FileHandle &handle) override {
 		return handle.file_system.GetFileType(handle);
 	}
 
