@@ -522,15 +522,29 @@ select 42;
 
 test('/* ;;;;;; */ select 42;', out='42')
 
+
+def start_pipe_write():
+     input_file = 'test/sql/copy/csv/data/test/test.csv'
+     if os.name == 'nt':
+          pipe_name = r'//./pipe/std_stream'
+          subprocess.Popen([sys.executable, 'tools/shell/win-pipe.py', input_file, pipe_name], shell=True)
+          print('Launched win-pipe.py')
+          input_file = None
+     else:
+          pipe_name = '/dev/stdin'
+     return pipe_name, input_file
+
+
+pipe_name, input_file = start_pipe_write()
 test('''
 create table mytable as select * from
-read_csv('/dev/stdin',
+read_csv('%s',
   columns=STRUCT_PACK(foo := 'INTEGER', bar := 'INTEGER', baz := 'VARCHAR'),
   AUTO_DETECT='false'
 );
 select * from mytable limit 1;
-''',
+''' % pipe_name,
 extra_commands=['-csv', ':memory:'],
-input_file='test/sql/copy/csv/data/test/test.csv',
+input_file=input_file,
 out='''foo,bar,baz
 0,0," test"''')
